@@ -1,3 +1,9 @@
+# Design
+
+* User accounts are managed with Django's built in authentication system
+* When a user account is registered, both a Pal and Member account are created for it
+
+
 # TIPS
 
 ## Create a super-user account to log into /admin

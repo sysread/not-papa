@@ -1,23 +1,32 @@
+from django.conf import settings
 from django.db import models
-from django.contrib.auth.models import User
 
 
 class Pal(models.Model):
-    account = models.ForeignKey(User, on_delete=models.PROTECT)
+    """A pal account, associated with a registered user account, is able to
+    fulfill visits to members.
+    """
+    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
 
     def __str__(self):
-        return f'Pal: {str(self.account)}'
+        return f'<pal> {str(self.account)}'
 
 
 class Member(models.Model):
-    account = models.ForeignKey(User, on_delete=models.PROTECT)
+    """A member account, associated with a registered user account, is able to
+    request visits by pals.
+    """
+    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     plan_minutes = models.PositiveIntegerField()
 
     def __str__(self):
-        return f'Member: {str(self.account)}'
+        return f'<member> {str(self.account)}'
 
 
 class Visit(models.Model):
+    """On its own, a visit requested by a member. Once it has been fulfilled by
+    a pal, a linked fulfillment is created.
+    """
     member = models.ForeignKey(Member, on_delete=models.PROTECT)
     when = models.DateTimeField()
     minutes = models.PositiveIntegerField()
@@ -25,12 +34,19 @@ class Visit(models.Model):
     cancelled = models.BooleanField()
 
     def __str__(self):
-        return f'Visit: {self.member} for {self.minutes} on {self.when}'
+        return f'Visit {self.member} for {self.minutes} minutes on {self.when}'
+
+    @property
+    def is_fulfilled(self):
+        return self.fulfillment is not None
 
 
 class Fulfillment(models.Model):
-    visit = models.ForeignKey(Visit, on_delete=models.PROTECT)
+    """Records when a visit is fulfilled by a pal.
+    """
+    visit = models.OneToOneField(Visit, on_delete=models.PROTECT)
     pal = models.ForeignKey(Pal, on_delete=models.PROTECT)
+    notes = models.TextField(blank=True)
 
     def __str__(self):
         return f'{self.pal} fulfilled {self.visit}'
