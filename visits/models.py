@@ -6,21 +6,21 @@ class Pal(models.Model):
     """A pal account, associated with a registered user account, is able to
     fulfill visits to members.
     """
-    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     def __str__(self):
-        return f'<pal> {str(self.account)}'
+        return f'(pal) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
 
 
 class Member(models.Model):
     """A member account, associated with a registered user account, is able to
     request visits by pals.
     """
-    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     plan_minutes = models.PositiveIntegerField()
 
     def __str__(self):
-        return f'<member> {str(self.account)}'
+        return f'(member) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
 
 
 class Visit(models.Model):

@@ -9,8 +9,7 @@
   {{ form | crispy }}
   <input type="hidden" name="next" value="{{ next }}">
   <button type="submit" class="btn btn-success">Login</button>
+  <a class="btn btn-info" href="{% url 'register' %}">No account? Register to get started!</a>
 </form>
-
-<p><a href="{% url 'register' %}">No account? Register to get started!</a></p>
 
 {% endblock %}

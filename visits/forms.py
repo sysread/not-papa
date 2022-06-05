@@ -12,21 +12,19 @@ class UserRegistrationForm(UserCreationForm):
     """It's a little goofy, but the built-in django user creation form does not
     offer a simple way to make the email field required. So here we are.
     """
-    email = forms.EmailField(
-        label=_("Email address"),
-        help_text=_("Please enter your email address."),
-        required=True,
-    )
+    first_name = forms.CharField(label='First name', required=True)
+    last_name = forms.CharField(label='Last name', required=True)
+    email = forms.EmailField(label="Email address", required=True)
 
     minutes = forms.IntegerField(
-        label=_("Monthly minutes"),
-        help_text=_("If your insurance covers this service, please enter the number of minutes allowed per month."),
+        label="Monthly minutes",
+        help_text="If your insurance covers this service, please enter the number of minutes per month you plan allows.",
         required=False,
     )
 
     class Meta:
         model = User
-        fields = ("email", "password1", "password2")
+        fields = ("first_name", "last_name", "email", "password1", "password2")
 
     @transaction.atomic
     def save(self, commit=True):
