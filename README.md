@@ -12,7 +12,7 @@
 
 ## Reset database and migrations
 
-    rm -R visits/migrations/* visits/migrations/__pycache__ db.sqlite3
+    rm -Rf visits/migrations/* db.sqlite3
     python manage.py makemigrations
     python manage.py migrate
 
