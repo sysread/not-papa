@@ -12,6 +12,12 @@
 
 ## Reset database and migrations
 
-    rm -R visits/migrations/0001_initial.py visits/migrations/__pycache__ db.sqlite3
+    rm -R visits/migrations/* visits/migrations/__pycache__ db.sqlite3
     python manage.py makemigrations
     python manage.py migrate
+
+
+# FUTURE
+
+* Insurance `Plan` model
+* All the kinds of security required to make account registration safe
