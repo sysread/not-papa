@@ -128,3 +128,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Crispy forms (bootstrap4 form rendering)
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+# Default landing page for logged in users
+LOGIN_REDIRECT_URL = '/visits'

@@ -1,11 +1,13 @@
+import datetime
+
 import django.forms as forms
 
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.utils.translation import ugettext_lazy as _
 
-from .models import Member, Pal
+from .models import Member, Pal, Visit, Fulfillment
 
 
 class UserRegistrationForm(UserCreationForm):
@@ -28,10 +30,10 @@ class UserRegistrationForm(UserCreationForm):
 
     @transaction.atomic
     def save(self, commit=True):
-        self.cleaned_data["username"] = self.cleaned_data["email"]
         user = super(UserCreationForm, self).save(commit=False)
         user.email = self.cleaned_data["email"]
         user.username = self.cleaned_data["email"]
+        user.set_password(self.cleaned_data["password1"])
 
         if commit:
             user.save()
@@ -39,3 +41,59 @@ class UserRegistrationForm(UserCreationForm):
             Pal(account=user).save()
 
         return user
+
+
+class MemberVisitRequestForm(forms.Form):
+    when = forms.DateTimeField(
+        required=True,
+        help_text="When would you like one of our Pals to visit you?",
+    )
+
+    minutes = forms.IntegerField(
+        required=True,
+        initial=60,
+        min_value=10,
+        help_text="How many minutes would you like to schedule this visit for?",
+    )
+
+    tasks = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'cols': 80, 'rows': 6}),
+        help_text="Please provide some basic details about what kinds of things our Pal should be ready to help with.",
+    )
+
+    def __init__(self, user, data=None, *args, **kwargs):
+        self.member = user.member
+        super(MemberVisitRequestForm, self).__init__(data, *args, **kwargs)
+
+    def clean(self):
+        """Adds additional validation to ensure that the member has the minutes
+        available for the requested visit.
+        """
+        cleaned_data = super().clean()
+
+        minutes_available = self.member.minutes_available(
+            month=cleaned_data["when"].month,
+            year=cleaned_data["when"].year,
+        )
+
+        if cleaned_data["minutes"] > minutes_available:
+            raise ValidationError(f"You have a maximum of {minutes_available} minutes remaining for visits this month. You can earn more minutes by visiting other members, cancelling planned visits, or scheduling farther into the future.")
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        if self.cleaned_data["when"] < datetime.datetime.now(datetime.timezone.utc):
+            raise ValidationError("Visits must be scheduled in advance.")
+
+        visit = Visit(
+            member=self.member,
+            when=self.cleaned_data["when"],
+            minutes=self.cleaned_data["minutes"],
+            tasks=self.cleaned_data["tasks"],
+        )
+
+        if commit:
+            visit.save()
+
+        return visit

@@ -19,5 +19,7 @@
 
 # FUTURE
 
+* `Member`s' local time zone should be detected by the "visit request" form
+* `Member`s' address would be needed to make an actual visit
 * Insurance `Plan` model
 * All the kinds of security required to make account registration safe

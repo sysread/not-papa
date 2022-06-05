@@ -1,4 +1,7 @@
+import datetime
+
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -7,6 +10,7 @@ class Pal(models.Model):
     fulfill visits to members.
     """
     account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    banked_minutes = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f'(pal) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
@@ -22,6 +26,22 @@ class Member(models.Model):
     def __str__(self):
         return f'(member) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
 
+    def minutes_available(self, month, year):
+        """Calculates the number of minutes available based on the member's
+        monthly allowance, minutes used or scheduled for visits in the
+        requested month/year, as well as any visits they have fulfilled
+        themselves as a pal.
+        """
+        # Get the list of visits scheduled for the requested month/year
+        visits = self.visit_set.filter(when__month=month, when__year=year)
+
+        # Count the number of minutes total for those visits
+        used = visits.aggregate(minutes_used=models.Sum("minutes")).get("minutes_used") or 0
+
+        # Return the number of minutes available for scheduling new visits
+        # during month/year.
+        return self.plan_minutes + self.account.pal.banked_minutes - used
+
 
 class Visit(models.Model):
     """On its own, a visit requested by a member. Once it has been fulfilled by
@@ -31,22 +51,45 @@ class Visit(models.Model):
     when = models.DateTimeField()
     minutes = models.PositiveIntegerField()
     tasks = models.TextField()
-    cancelled = models.BooleanField()
+    cancelled = models.BooleanField(default=False)
 
     def __str__(self):
-        return f'Visit {self.member} for {self.minutes} minutes on {self.when}'
+        return f'Visit ({self.str_state}) {self.member} for {self.minutes} minutes on {self.when}'
+
+    @property
+    def fulfillment(self):
+        # NOTE: django caches result sets
+        return self.fulfillment_set.filter(cancelled=False).first()
+
+    @property
+    def is_scheduled(self):
+        return self.fulfillment is not None and self.fulfillment.completed is False
 
     @property
     def is_fulfilled(self):
-        return self.fulfillment is not None
+        return self.fulfillment is not None and self.fulfillment.completed is True
+
+    @property
+    def str_state(self):
+        if self.is_fulfilled:
+            return "completed"
+        elif self.is_scheduled:
+            return "scheduled"
+        else:
+            return "unscheduled"
 
 
 class Fulfillment(models.Model):
     """Records when a visit is fulfilled by a pal.
     """
-    visit = models.OneToOneField(Visit, on_delete=models.PROTECT)
+    visit = models.ForeignKey(Visit, on_delete=models.PROTECT)
     pal = models.ForeignKey(Pal, on_delete=models.PROTECT)
     notes = models.TextField(blank=True)
+    completed = models.BooleanField(default=False)
+    cancelled = models.BooleanField(default=False)
 
     def __str__(self):
+        if self.pal is None:
+            return f'(Unfulfilled) {self.visit}'
+
         return f'{self.pal} fulfilled {self.visit}'
