@@ -13,7 +13,7 @@
 ## Reset database and migrations
 
     rm -Rf visits/migrations/* db.sqlite3
-    python manage.py makemigrations
+    python manage.py makemigrations visits
     python manage.py migrate
 
 
