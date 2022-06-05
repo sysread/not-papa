@@ -23,3 +23,4 @@
 * `Member`s' address would be needed to make an actual visit
 * Insurance `Plan` model
 * All the kinds of security required to make account registration safe
+* Paginate the list of completed visits when displaying a member's visits

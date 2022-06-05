@@ -6,21 +6,26 @@ from .forms import UserRegistrationForm, MemberVisitRequestForm
 
 
 def index(request):
+    """Displays the homepage.
+    """
     return render(request, 'index.html', {})
 
 
 def register(request):
+    """Registers a new user account. For every new user, both a member and pal
+    account are created.
+    """
     form = UserRegistrationForm()
 
-    if request.method == 'POST':
+    if request.method == "POST":
         form = UserRegistrationForm(request.POST)
         if form.is_valid():
             user = form.save()
             login(request, user)
-            return redirect('index')
+            return redirect("index")
 
-    return render(request, 'registration/register.html', {
-        'form': form,
+    return render(request, "registration/register.html", {
+        "form": form,
     })
 
 
@@ -28,17 +33,43 @@ def register(request):
 # fulfilled visits.
 @login_required
 def request_visit(request):
+    """Displays a form allowing members to request a visit by a pal.
+    """
     form = MemberVisitRequestForm(request.user)
 
-    if request.method == 'POST':
+    if request.method == "POST":
         form = MemberVisitRequestForm(request.user, request.POST)
         if form.is_valid():
             form.save()
-            return redirect('index')
+            return redirect("list-visits")
 
-    return render(request, 'request-visit.html', {
-        'form': form,
+    return render(request, "request-visit.html", {
+        "form": form,
     })
 
 
+@login_required
+def list_visits(request):
+    """Displays the list of visits.
+    """
+    visits = request.user.member.visit_set.order_by("-when")
+
+    return render(request, "list-visits.html", {
+        "visits": visits.all(),
+    })
+
+
+@login_required
+def cancel_visit(request):
+    pass
+
+
+@login_required
+def schedule_fulfillment(request):
+    pass
+
+
 # TODO: add to pal.banked_minutes when fulfilling a visit
+@login_required
+def complete_fulfillment(request):
+    pass

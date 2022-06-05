@@ -66,12 +66,12 @@ class Visit(models.Model):
         return self.fulfillment is not None and self.fulfillment.completed is False
 
     @property
-    def is_fulfilled(self):
+    def is_completed(self):
         return self.fulfillment is not None and self.fulfillment.completed is True
 
     @property
     def str_state(self):
-        if self.is_fulfilled:
+        if self.is_completed:
             return "completed"
         elif self.is_scheduled:
             return "scheduled"
