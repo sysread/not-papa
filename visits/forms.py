@@ -97,3 +97,35 @@ class MemberVisitRequestForm(forms.Form):
             visit.save()
 
         return visit
+
+
+class CancelRequestedVisitForm(forms.Form):
+    """Cancels a requested visit after validating that it is possible to cancel
+    it. Once `clean()` has been called, the form stores the visit to cancel as
+    `form.visit`.
+    """
+    visit_id = forms.IntegerField(required=True, widget=forms.HiddenInput)
+
+    def clean(self):
+        """Validates that the visit can indeed be cancelled.
+        """
+        cleaned_data = super().clean()
+
+        try:
+            visit = Visit.objects.get(pk=cleaned_data["visit_id"])
+            cancellable, reason = visit.is_cancellable()
+            if not cancellable:
+                raise ValidationError(reason)
+        except Visit.DoesNotExist:
+            raise ValidationError("Visit not found")
+
+        # NOTE that the visit is stored in the object once clean() has been
+        # called successfully on the form data.
+        self.visit = visit
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        self.visit.cancelled = True
+        if commit:
+            self.visit.save()

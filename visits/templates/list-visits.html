@@ -10,11 +10,14 @@
     <th>Actions</th>
   </thead>
   <tbody>
-    {% for visit in visits %}
+    {% for visit, form in visits %}
 
-    {% if visit.is_completed %}<tr class="table-dark">
-    {% elif visit.is_scheduled %}<tr class="table-success">
-    {% else %}<tr>
+    {% if visit.is_completed %}
+    <tr class="table-dark">
+    {% elif visit.is_scheduled %}
+    <tr class="table-success">
+    {% else %}
+    <tr>
     {% endif %}
 
       <td>{{ visit.when }}</td>
@@ -27,8 +30,9 @@
       </td>
       <td>
         {% if not visit.is_completed %}
-        <form method="post" action="">
+        <form method="post" action="{% url 'cancel-visit' %}">
           {% csrf_token %}
+          {{ form }}
           <button type="submit" class="btn btn-danger">Cancel</button>
         </form>
         {% endif %}

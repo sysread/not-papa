@@ -1,7 +1,6 @@
 import datetime
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -33,7 +32,11 @@ class Member(models.Model):
         themselves as a pal.
         """
         # Get the list of visits scheduled for the requested month/year
-        visits = self.visit_set.filter(when__month=month, when__year=year)
+        visits = self.visit_set.filter(
+            cancelled=False,
+            when__month=month,
+            when__year=year,
+        )
 
         # Count the number of minutes total for those visits
         used = visits.aggregate(minutes_used=models.Sum("minutes")).get("minutes_used") or 0
@@ -71,12 +74,32 @@ class Visit(models.Model):
 
     @property
     def str_state(self):
-        if self.is_completed:
+        if self.cancelled:
+            return "cancelled"
+        elif self.is_completed:
             return "completed"
         elif self.is_scheduled:
             return "scheduled"
         else:
             return "unscheduled"
+
+    def is_cancellable(self):
+        """Returns a tuple of (can_cancel(bool), reason(string)).
+        """
+        # You can't cancel and already fulfilled visit
+        if self.is_completed:
+            return (False, "This visit was already completed.")
+
+        # If the visit has been scheduled with a member, then don't allow
+        # cancellation after the appointment has started.
+        #
+        # TODO: there should be some grace period for the pal so they don't
+        # have an appointment they've already left for cancelled out from under
+        # them.
+        if self.is_scheduled and self.when <= datetime.datetime.now():
+            return (False, "Unable to cancel a visit which has already begun.")
+
+        return (True, None)
 
 
 class Fulfillment(models.Model):

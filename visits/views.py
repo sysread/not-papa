@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 
-from .forms import UserRegistrationForm, MemberVisitRequestForm
+from .forms import UserRegistrationForm, MemberVisitRequestForm, CancelRequestedVisitForm
 
 
 def index(request):
@@ -52,16 +52,26 @@ def request_visit(request):
 def list_visits(request):
     """Displays the list of visits.
     """
-    visits = request.user.member.visit_set.order_by("-when")
+    query = request.user.member.visit_set.order_by("-when").filter(cancelled=False)
+    visits = [(v, CancelRequestedVisitForm(initial={"visit_id": v.id})) for v in query.all()]
 
     return render(request, "list-visits.html", {
-        "visits": visits.all(),
+        "visits": visits,
     })
 
 
 @login_required
 def cancel_visit(request):
-    pass
+    """list_views displays a form to cancel visits requested by the member
+    which have not yet been fulfilled. This endpoint handles the POST from that
+    form.
+    """
+    if request.method == "POST":
+        form = CancelRequestedVisitForm(request.POST)
+        if form.is_valid():
+            form.save()
+
+    return redirect("list-visits")
 
 
 @login_required
