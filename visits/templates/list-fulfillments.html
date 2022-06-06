@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h4>Manage your schedule</h4>
+
+<p>Here you can accept new appointments and manage appointments which you have already accepted.</p>
+
+<div class="py-3">
+  <h5>Your scheduled appointments</h5>
+
+  <table class="table">
+    <thead>
+      <th>Start time</th>
+      <th>Length (minutes)</th>
+      <th>Summary</th>
+      <th>Actions</th>
+    </thead>
+    <tbody>
+      {% for fulfillment in fulfillments %}
+      <tr>
+        <td>{{ fulfillment.visit.when }}</td>
+        <td>{{ fulfillment.visit.minutes }}</td>
+        <td>{{ fulfillment.visit.tasks | linebreaksbr }}</td>
+        <td>
+          {% if fulfillment.ready_to_complete %}
+          <button class="btn btn-success">Complete</button>
+          {% endif %}
+
+          <button class="btn btn-danger">Cancel</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="py-3">
+  <h5>Available appointments</h5>
+
+  <table class="table">
+    <thead>
+      <th>Start time</th>
+      <th>Length (minutes)</th>
+      <th>Summary</th>
+      <th>Actions</th>
+    </thead>
+    <tbody>
+      {% for visit, form in visits %}
+      <tr>
+        <td>{{ visit.when }}</td>
+        <td>{{ visit.minutes }}</td>
+        <td>{{ visit.tasks | linebreaksbr }}</td>
+        <td>
+          <form method="post" action="{% url 'schedule-fulfillment' %}">
+            {% csrf_token %}
+            {{ form }}
+            <button type="submit" class="btn btn-success">Accept</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% endblock %}

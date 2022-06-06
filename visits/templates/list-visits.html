@@ -6,6 +6,7 @@
   <thead>
     <th>Visit</th>
     <th>Length (minutes)</th>
+    <th>Summary</th>
     <th>Status</th>
     <th>Actions</th>
   </thead>
@@ -22,6 +23,7 @@
 
       <td>{{ visit.when }}</td>
       <td>{{ visit.minutes }}</td>
+      <td>{{ visit.tasks | linebreaksbr }}</td>
       <td>
         <div>{{ visit.str_state | capfirst }}</div>
         {% if visit.str_state == "unscheduled" %}

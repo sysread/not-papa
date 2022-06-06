@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timezone
 
 import django.forms as forms
 
@@ -43,7 +43,19 @@ class UserRegistrationForm(UserCreationForm):
         return user
 
 
-class MemberVisitRequestForm(forms.Form):
+class MemberForm(forms.Form):
+    def __init__(self, user, *args, **kwargs):
+        self.member = user.member
+        super(MemberForm, self).__init__(*args, **kwargs)
+
+
+class PalForm(forms.Form):
+    def __init__(self, user, *args, **kwargs):
+        self.pal = user.pal
+        super(PalForm, self).__init__(*args, **kwargs)
+
+
+class MemberVisitRequestForm(MemberForm):
     when = forms.DateTimeField(
         required=True,
         help_text="When would you like one of our Pals to visit you?",
@@ -62,10 +74,6 @@ class MemberVisitRequestForm(forms.Form):
         help_text="Please provide some basic details about what kinds of things our Pal should be ready to help with.",
     )
 
-    def __init__(self, user, data=None, *args, **kwargs):
-        self.member = user.member
-        super(MemberVisitRequestForm, self).__init__(data, *args, **kwargs)
-
     def clean(self):
         """Adds additional validation to ensure that the member has the minutes
         available for the requested visit.
@@ -83,7 +91,7 @@ class MemberVisitRequestForm(forms.Form):
         return cleaned_data
 
     def save(self, commit=True):
-        if self.cleaned_data["when"] < datetime.datetime.now(datetime.timezone.utc):
+        if self.cleaned_data["when"] < datetime.now(timezone.utc):
             raise ValidationError("Visits must be scheduled in advance.")
 
         visit = Visit(
@@ -99,10 +107,8 @@ class MemberVisitRequestForm(forms.Form):
         return visit
 
 
-class CancelRequestedVisitForm(forms.Form):
-    """Cancels a requested visit after validating that it is possible to cancel
-    it. Once `clean()` has been called, the form stores the visit to cancel as
-    `form.visit`.
+class CancelRequestedVisitForm(MemberForm):
+    """Cancels a visit after validating that it is possible to do so.
     """
     visit_id = forms.IntegerField(required=True, widget=forms.HiddenInput)
 
@@ -112,20 +118,36 @@ class CancelRequestedVisitForm(forms.Form):
         cleaned_data = super().clean()
 
         try:
-            visit = Visit.objects.get(pk=cleaned_data["visit_id"])
-            cancellable, reason = visit.is_cancellable()
-            if not cancellable:
-                raise ValidationError(reason)
+            cleaned_data["visit"] = self.member.visit_set.pending().get(pk=cleaned_data["visit_id"])
         except Visit.DoesNotExist:
             raise ValidationError("Visit not found")
-
-        # NOTE that the visit is stored in the object once clean() has been
-        # called successfully on the form data.
-        self.visit = visit
 
         return cleaned_data
 
     def save(self, commit=True):
-        self.visit.cancelled = True
+        self.cleaned_data["visit"].cancelled = True
         if commit:
-            self.visit.save()
+            self.cleaned_data["visit"].save()
+
+
+class AcceptVisitForm(PalForm):
+    visit_id = forms.IntegerField(required=True, widget=forms.HiddenInput)
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        try:
+            cleaned_data["visit"] = Visit.objects.unscheduled().get(pk=cleaned_data["visit_id"])
+        except Visit.DoesNotExist:
+            raise ValidationError("Visit not found")
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        fulfillment = Fulfillment(
+            visit=self.cleaned_data["visit"],
+            pal=self.pal,
+        )
+
+        if commit:
+            fulfillment.save()

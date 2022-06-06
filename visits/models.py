@@ -1,7 +1,10 @@
-import datetime
+from datetime import datetime, timedelta, timezone
+
 
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Now
 
 
 class Pal(models.Model):
@@ -46,6 +49,18 @@ class Member(models.Model):
         return self.plan_minutes + self.account.pal.banked_minutes - used
 
 
+class VisitManager(models.Manager):
+    def pending(self):
+        """Selects all future visits that have not been cancelled.
+        """
+        return self.filter(cancelled=False, when__gte=Now())
+
+    def unscheduled(self):
+        """Selects pending visits which have no active, pending fulfillments.
+        """
+        return self.pending().filter(Q(fulfillment__isnull=True) | Q(fulfillment__cancelled=True))
+
+
 class Visit(models.Model):
     """On its own, a visit requested by a member. Once it has been fulfilled by
     a pal, a linked fulfillment is created.
@@ -55,6 +70,9 @@ class Visit(models.Model):
     minutes = models.PositiveIntegerField()
     tasks = models.TextField()
     cancelled = models.BooleanField(default=False)
+
+    # Custom model manager
+    objects = VisitManager()
 
     def __str__(self):
         return f'Visit ({self.str_state}) {self.member} for {self.minutes} minutes on {self.when}'
@@ -83,24 +101,6 @@ class Visit(models.Model):
         else:
             return "unscheduled"
 
-    def is_cancellable(self):
-        """Returns a tuple of (can_cancel(bool), reason(string)).
-        """
-        # You can't cancel and already fulfilled visit
-        if self.is_completed:
-            return (False, "This visit was already completed.")
-
-        # If the visit has been scheduled with a member, then don't allow
-        # cancellation after the appointment has started.
-        #
-        # TODO: there should be some grace period for the pal so they don't
-        # have an appointment they've already left for cancelled out from under
-        # them.
-        if self.is_scheduled and self.when <= datetime.datetime.now():
-            return (False, "Unable to cancel a visit which has already begun.")
-
-        return (True, None)
-
 
 class Fulfillment(models.Model):
     """Records when a visit is fulfilled by a pal.
@@ -116,3 +116,17 @@ class Fulfillment(models.Model):
             return f'(Unfulfilled) {self.visit}'
 
         return f'{self.pal} fulfilled {self.visit}'
+
+    @property
+    def ready_to_complete(self):
+        if self.completed:
+            return False
+
+        if self.cancelled:
+            return False
+
+        now = datetime.now(timezone.utc)
+        if now < self.visit.when + timedelta(minutes=self.visit.minutes):
+            return False
+
+        return True
