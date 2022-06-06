@@ -2,9 +2,12 @@
 
 {% block content %}
 
+{% load humanize %}
 {% load crispy_forms_tags %}
 
 <h4>Request a visit from a Pal</h4>
+
+<p>You have <strong>{{ request.user.member.current_minutes_available | intcomma }}</strong> minutes available to request visits.
 
 <form action="{% url 'request-visit' %}" method="post">
   {% csrf_token %}

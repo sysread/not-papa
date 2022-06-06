@@ -12,10 +12,23 @@ class Pal(models.Model):
     fulfill visits to members.
     """
     account = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    banked_minutes = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return f'(pal) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
+
+    def banked_minutes(self, month, year):
+        fulfillments = self.fulfillment_set.filter(
+            visit__when__month=month,
+            visit__when__year=year,
+            completed=True,
+        )
+
+        return fulfillments.aggregate(banked=models.Sum("minutes")).get("banked") or 0
+
+    @property
+    def current_banked_minutes(self):
+        now = datetime.now(timezone.utc)
+        return self.banked_minutes(now.month, now.year)
 
 
 class Member(models.Model):
@@ -28,25 +41,36 @@ class Member(models.Model):
     def __str__(self):
         return f'(member) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
 
+    def plan_minutes_remaining(self, month, year):
+        visits = self.visit_set.filter(
+            when__month=month,
+            when__year=year,
+            cancelled=False,
+            fulfillment__completed=True,
+        )
+
+        # Count the number of minutes total for those visits
+        used = visits.aggregate(minutes_used=models.Sum("minutes")).get("minutes_used") or 0
+
+        return self.plan_minutes - used
+
     def minutes_available(self, month, year):
         """Calculates the number of minutes available based on the member's
         monthly allowance, minutes used or scheduled for visits in the
         requested month/year, as well as any visits they have fulfilled
         themselves as a pal.
         """
-        # Get the list of visits scheduled for the requested month/year
-        visits = self.visit_set.filter(
-            cancelled=False,
-            when__month=month,
-            when__year=year,
-        )
+        return self.plan_minutes_remaining(month, year) + self.account.pal.current_banked_minutes
 
-        # Count the number of minutes total for those visits
-        used = visits.aggregate(minutes_used=models.Sum("minutes")).get("minutes_used") or 0
+    @property
+    def current_minutes_available(self):
+        now = datetime.now(timezone.utc)
+        return self.minutes_available(now.month, now.year)
 
-        # Return the number of minutes available for scheduling new visits
-        # during month/year.
-        return self.plan_minutes + self.account.pal.banked_minutes - used
+    @property
+    def current_plan_minutes_remaining(self):
+        now = datetime.now(timezone.utc)
+        return self.plan_minutes_remaining(now.month, now.year)
 
 
 class VisitManager(models.Manager):
@@ -107,26 +131,34 @@ class Fulfillment(models.Model):
     """
     visit = models.ForeignKey(Visit, on_delete=models.PROTECT)
     pal = models.ForeignKey(Pal, on_delete=models.PROTECT)
-    notes = models.TextField(blank=True)
     completed = models.BooleanField(default=False)
     cancelled = models.BooleanField(default=False)
 
     def __str__(self):
-        if self.pal is None:
+        if self.cancelled:
+            return f'(Cancelled) {self.visit}'
+
+        if not self.completed:
             return f'(Unfulfilled) {self.visit}'
 
         return f'{self.pal} fulfilled {self.visit}'
 
     @property
-    def ready_to_complete(self):
+    def is_ready_to_complete(self):
         if self.completed:
             return False
 
         if self.cancelled:
             return False
 
-        now = datetime.now(timezone.utc)
-        if now < self.visit.when + timedelta(minutes=self.visit.minutes):
+        return datetime.now(timezone.utc) >= (self.visit.when + timedelta(minutes=self.visit.minutes))
+
+    @property
+    def is_cancellable(self):
+        if self.completed:
             return False
 
-        return True
+        if self.cancelled:
+            return False
+
+        return datetime.now(timezone.utc) < self.visit.when

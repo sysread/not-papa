@@ -17,17 +17,27 @@
       <th>Actions</th>
     </thead>
     <tbody>
-      {% for fulfillment in fulfillments %}
+      {% for fulfillment, complete_form, cancel_form in fulfillments %}
       <tr>
         <td>{{ fulfillment.visit.when }}</td>
         <td>{{ fulfillment.visit.minutes }}</td>
         <td>{{ fulfillment.visit.tasks | linebreaksbr }}</td>
         <td>
-          {% if fulfillment.ready_to_complete %}
-          <button class="btn btn-success">Complete</button>
+          {% if fulfillment.is_ready_to_complete %}
+          <form class="py-1" method="post" action="{% url 'complete-fulfillment' %}">
+            {% csrf_token %}
+            {{ complete_form }}
+            <button type="submit" class="btn btn-success">Complete</button>
+          </form>
           {% endif %}
 
-          <button class="btn btn-danger">Cancel</button>
+          {% if fulfillment.is_cancellable %}
+          <form class="py-1" method="post" action="{% url 'cancel-fulfillment' %}">
+            {% csrf_token %}
+            {{ cancel_form }}
+            <button class="btn btn-danger">Cancel</button>
+          </form>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}

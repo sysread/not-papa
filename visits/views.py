@@ -1,10 +1,14 @@
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
 from django.shortcuts import render, redirect
 
-from .forms import UserRegistrationForm, MemberVisitRequestForm, CancelRequestedVisitForm, AcceptVisitForm
-from .models import Visit, Fulfillment
+from .models import Visit
+from .forms import UserRegistrationForm,\
+    MemberVisitRequestForm, \
+    CancelRequestedVisitForm, \
+    AcceptVisitForm, \
+    CompleteVisitForm, \
+    CancelFulfillmentForm
 
 
 def index(request):
@@ -83,13 +87,22 @@ def list_fulfillments(request):
     The Pal is able to cancel their commitments to future appointments, accept
     new appointments, and complete Visits which they have finished.
     """
-    fulfillments = request.user.pal.fulfillment_set.order_by("visit__when").filter(completed=False, cancelled=False)
+    fulfillments = [
+        (
+            f,
+            CompleteVisitForm(request.user, initial={"fulfillment_id": f.id}),
+            CancelFulfillmentForm(request.user, initial={"fulfillment_id": f.id})
+        )
+        for f in request.user.pal.fulfillment_set.order_by("visit__when").filter(completed=False, cancelled=False).all()
+    ]
 
-    visits = [(v, AcceptVisitForm(request.user, initial={"visit_id": v.id}))
-              for v in Visit.objects.unscheduled().exclude(member=request.user.member).order_by("when").all()]
+    visits = [
+        (v, AcceptVisitForm(request.user, initial={"visit_id": v.id}))
+        for v in Visit.objects.unscheduled().exclude(member=request.user.member).order_by("when").all()
+    ]
 
     return render(request, "list-fulfillments.html", {
-        "fulfillments": fulfillments.all(),
+        "fulfillments": fulfillments,
         "visits": visits,
     })
 
@@ -107,12 +120,27 @@ def schedule_fulfillment(request):
     return redirect("list-fulfillments")
 
 
-# TODO: add to pal.banked_minutes when fulfilling a visit
 @login_required
 def complete_fulfillment(request):
-    pass
+    """list_fulfillments displays a form for the Pal to complete previously
+    accepted/scheduled visits. This endpoint handles the POST from that form.
+    """
+    if request.method == "POST":
+        form = CompleteVisitForm(request.user, request.POST)
+        if form.is_valid():
+            form.save()
+
+    return redirect("list-fulfillments")
 
 
 @login_required
 def cancel_fulfillment(request):
-    pass
+    """list_fulfillments displays a form for the Pal to cancel previously
+    accepted/scheduled visits. This endpoint handles the POST from that form.
+    """
+    if request.method == "POST":
+        form = CancelFulfillmentForm(request.user, request.POST)
+        if form.is_valid():
+            form.save()
+
+    return redirect("list-fulfillments")

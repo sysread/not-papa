@@ -131,6 +131,8 @@ class CancelRequestedVisitForm(MemberForm):
 
 
 class AcceptVisitForm(PalForm):
+    """Assigns a Visit to a Pal by creating a Fulfillment for that visit.
+    """
     visit_id = forms.IntegerField(required=True, widget=forms.HiddenInput)
 
     def clean(self):
@@ -144,10 +146,58 @@ class AcceptVisitForm(PalForm):
         return cleaned_data
 
     def save(self, commit=True):
-        fulfillment = Fulfillment(
-            visit=self.cleaned_data["visit"],
-            pal=self.pal,
-        )
+        fulfillment = Fulfillment(visit=self.cleaned_data["visit"], pal=self.pal)
 
         if commit:
             fulfillment.save()
+
+
+class CompleteVisitForm(PalForm):
+    """Completes a Fulfillment for a Visit that has been assigned to a Pal.
+    """
+    fulfillment_id = forms.IntegerField(required=True, widget=forms.HiddenInput)
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        try:
+            fulfillment = Fulfillment.objects.get(pk=cleaned_data["fulfillment_id"])
+            if not fulfillment.is_ready_to_complete:
+                raise ValidationError('This visit is not finished yet.')
+            cleaned_data["fulfillment"] = fulfillment
+        except Visit.DoesNotExist:
+            raise ValidationError("Fulfillment for this Visit not found")
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        self.cleaned_data["fulfillment"].completed = True
+
+        if commit:
+            self.cleaned_data["fulfillment"].save()
+            self.pal.save()
+
+
+class CancelFulfillmentForm(PalForm):
+    """Cancels an incomplete Fulfillment for a Visit that has been assigned to a Pal.
+    """
+    fulfillment_id = forms.IntegerField(required=True, widget=forms.HiddenInput)
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        try:
+            fulfillment = Fulfillment.objects.get(pk=cleaned_data["fulfillment_id"])
+            if not fulfillment.is_cancellable:
+                raise ValidationError('It is too late to cancel this appointment.')
+            cleaned_data["fulfillment"] = fulfillment
+        except Visit.DoesNotExist:
+            raise ValidationError("Fulfillment for this Visit not found")
+
+        return cleaned_data
+
+    def save(self, commit=True):
+        self.cleaned_data["fulfillment"].cancelled = True
+
+        if commit:
+            self.cleaned_data["fulfillment"].save()
