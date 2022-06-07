@@ -1,10 +1,18 @@
+from calendar import monthrange
 from datetime import datetime, timedelta, timezone
-
 
 from django.conf import settings
 from django.db import models
-from django.db.models import Q
-from django.db.models.functions import Now
+from django.db.models import Sum, Q
+from django.db.models.functions import Now, TruncMonth
+
+
+def last_day_of_month(month, year):
+    return datetime(year, month, monthrange(year, month)[1], tzinfo=timezone.utc)
+
+
+def first_day_of_month(month, year):
+    return datetime(year, month, monthrange(year, month)[0], tzinfo=timezone.utc)
 
 
 class Pal(models.Model):
@@ -15,20 +23,6 @@ class Pal(models.Model):
 
     def __str__(self):
         return f'(pal) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
-
-    def banked_minutes(self, month, year):
-        fulfillments = self.fulfillment_set.filter(
-            visit__when__month=month,
-            visit__when__year=year,
-            completed=True,
-        )
-
-        return fulfillments.aggregate(banked=models.Sum("minutes")).get("banked") or 0
-
-    @property
-    def current_banked_minutes(self):
-        now = datetime.now(timezone.utc)
-        return self.banked_minutes(now.month, now.year)
 
 
 class Member(models.Model):
@@ -42,35 +36,43 @@ class Member(models.Model):
         return f'(member) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
 
     def plan_minutes_remaining(self, month, year):
-        visits = self.visit_set.filter(
-            when__month=month,
-            when__year=year,
-            cancelled=False,
-            fulfillment__completed=True,
-        )
+        debits = self.account.minuteledger_set \
+            .filter(cancelled=False, amount__lt=0, created__lte=last_day_of_month(month, year)) \
+            .aggregate(Sum("amount"))
 
-        # Count the number of minutes total for those visits
-        used = visits.aggregate(minutes_used=models.Sum("minutes")).get("minutes_used") or 0
+        total = abs(debits["amount__sum"] or 0)
 
-        return self.plan_minutes - used
+        if self.plan_minutes > total:
+            return self.plan_minutes - total
 
-    def minutes_available(self, month, year):
-        """Calculates the number of minutes available based on the member's
-        monthly allowance, minutes used or scheduled for visits in the
-        requested month/year, as well as any visits they have fulfilled
-        themselves as a pal.
-        """
-        return self.plan_minutes_remaining(month, year) + self.account.pal.current_banked_minutes
-
-    @property
-    def current_minutes_available(self):
-        now = datetime.now(timezone.utc)
-        return self.minutes_available(now.month, now.year)
+        return 0
 
     @property
     def current_plan_minutes_remaining(self):
         now = datetime.now(timezone.utc)
         return self.plan_minutes_remaining(now.month, now.year)
+
+    def minutes_available(self, month, year):
+        ledger = self.account.minuteledger_set.filter(cancelled=False, created__lte=last_day_of_month(month, year))
+
+        debits_by_month = ledger \
+            .filter(amount__lt=0) \
+            .annotate(month=TruncMonth("created")) \
+            .values("month") \
+            .annotate(total=Sum("amount") + self.plan_minutes) \
+            .values("total") \
+            .filter(total__lt=0)
+
+        credits = ledger.filter(amount__gt=0) \
+            .annotate(total=Sum("amount")) \
+            .values("total")
+
+        return sum(row["total"] for row in credits) + sum(row["total"] for row in debits_by_month)
+
+    @property
+    def current_minutes_available(self):
+        now = datetime.now(timezone.utc)
+        return self.minutes_available(now.month, now.year)
 
 
 class VisitManager(models.Manager):
@@ -162,3 +164,25 @@ class Fulfillment(models.Model):
             return False
 
         return datetime.now(timezone.utc) < self.visit.when
+
+
+class MinuteLedger(models.Model):
+    VISIT_SCHEDULED = "visit_scheduled"
+    VISIT_FULFILLED = "visit_fulfilled"
+    REASONS = [
+        (VISIT_SCHEDULED, "Member scheduled a visit"),
+        (VISIT_FULFILLED, "Pal completed a visit"),
+    ]
+
+    created = models.DateTimeField(auto_now_add=True)
+    modified = models.DateTimeField(auto_now=True)
+
+    account = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    visit = models.ForeignKey(Visit, on_delete=models.CASCADE)
+    amount = models.IntegerField()
+    reason = models.CharField(max_length=100, choices=REASONS)
+    cancelled = models.BooleanField(default=False)
+
+    def __str__(self):
+        amount = self.amount if self.amount > 0 else f"({abs(self.amount)})"
+        return f"{self.created} | {amount} | {self.account}"

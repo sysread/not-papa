@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import Member, Pal, Visit, Fulfillment
+from .models import Member, Pal, Visit, Fulfillment, MinuteLedger
 
 
 class UserRegistrationForm(UserCreationForm):
@@ -37,8 +37,12 @@ class UserRegistrationForm(UserCreationForm):
 
         if commit:
             user.save()
-            Member(account=user, plan_minutes=self.cleaned_data["minutes"]).save()
-            Pal(account=user).save()
+
+            member = Member(account=user, plan_minutes=self.cleaned_data["minutes"])
+            member.save()
+
+            pal = Pal(account=user)
+            pal.save()
 
         return user
 
@@ -79,14 +83,15 @@ class MemberVisitRequestForm(MemberForm):
         available for the requested visit.
         """
         cleaned_data = super().clean()
+        month = cleaned_data["when"].month
+        year = cleaned_data["when"].year
 
-        minutes_available = self.member.minutes_available(
-            month=cleaned_data["when"].month,
-            year=cleaned_data["when"].year,
-        )
+        plan = self.member.plan_minutes_remaining(month, year)
+        banked = self.member.minutes_available(month, year)
+        available = plan + banked
 
-        if cleaned_data["minutes"] > minutes_available:
-            raise ValidationError(f"You have a maximum of {minutes_available} minutes remaining for visits this month. You can earn more minutes by visiting other members, cancelling planned visits, or scheduling farther into the future.")
+        if cleaned_data["minutes"] > available:
+            raise ValidationError(f"You have a maximum of {available} minutes remaining for visits this month. You can earn more minutes by visiting other members, cancelling planned visits, or scheduling farther into the future.")
 
         return cleaned_data
 
@@ -103,6 +108,13 @@ class MemberVisitRequestForm(MemberForm):
 
         if commit:
             visit.save()
+
+            MinuteLedger(
+                account=self.member.account,
+                visit=visit,
+                reason=MinuteLedger.VISIT_SCHEDULED,
+                amount=-self.cleaned_data["minutes"],
+            ).save()
 
         return visit
 
@@ -128,6 +140,8 @@ class CancelRequestedVisitForm(MemberForm):
         self.cleaned_data["visit"].cancelled = True
         if commit:
             self.cleaned_data["visit"].save()
+            self.cleaned_data["visit"].fulfillments_set.update(canceled=True)
+            self.cleaned_data["visit"].minutes_set.update(canceled=True)
 
 
 class AcceptVisitForm(PalForm):
@@ -147,12 +161,11 @@ class AcceptVisitForm(PalForm):
 
     def save(self, commit=True):
         fulfillment = Fulfillment(visit=self.cleaned_data["visit"], pal=self.pal)
-
         if commit:
             fulfillment.save()
 
 
-class CompleteVisitForm(PalForm):
+class CompleteFulfillmentForm(PalForm):
     """Completes a Fulfillment for a Visit that has been assigned to a Pal.
     """
     fulfillment_id = forms.IntegerField(required=True, widget=forms.HiddenInput)
@@ -176,6 +189,13 @@ class CompleteVisitForm(PalForm):
         if commit:
             self.cleaned_data["fulfillment"].save()
             self.pal.save()
+
+            MinuteLedger(
+                account=self.pal.account,
+                visit=self.cleaned_data["fulfillment"].visit,
+                amount=self.cleaned_data["fulfillment"].visit.minutes,
+                reason=MinuteLedger.VISIT_FULFILLED,
+            ).save()
 
 
 class CancelFulfillmentForm(PalForm):

@@ -7,7 +7,7 @@ from .forms import UserRegistrationForm,\
     MemberVisitRequestForm, \
     CancelRequestedVisitForm, \
     AcceptVisitForm, \
-    CompleteVisitForm, \
+    CompleteFulfillmentForm, \
     CancelFulfillmentForm
 
 
@@ -90,7 +90,7 @@ def list_fulfillments(request):
     fulfillments = [
         (
             f,
-            CompleteVisitForm(request.user, initial={"fulfillment_id": f.id}),
+            CompleteFulfillmentForm(request.user, initial={"fulfillment_id": f.id}),
             CancelFulfillmentForm(request.user, initial={"fulfillment_id": f.id})
         )
         for f in request.user.pal.fulfillment_set.order_by("visit__when").filter(completed=False, cancelled=False).all()
@@ -126,7 +126,7 @@ def complete_fulfillment(request):
     accepted/scheduled visits. This endpoint handles the POST from that form.
     """
     if request.method == "POST":
-        form = CompleteVisitForm(request.user, request.POST)
+        form = CompleteFulfillmentForm(request.user, request.POST)
         if form.is_valid():
             form.save()
 

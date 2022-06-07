@@ -7,7 +7,8 @@
 
 <h4>Request a visit from a Pal</h4>
 
-<p>You have <strong>{{ request.user.member.current_minutes_available | intcomma }}</strong> minutes available to request visits.
+<p>You have <strong>{{ user.member.current_plan_minutes_remaining | intcomma }}</strong> minutes remaining this month out of the <strong>{{ user.member.plan_minutes | intcomma }}</strong> monthly minutes provided by your plan.
+<p>You have banked <strong>{{ user.member.current_minutes_available | intcomma }}</strong> minutes by fulfilling visits yourself.
 
 <form action="{% url 'request-visit' %}" method="post">
   {% csrf_token %}
