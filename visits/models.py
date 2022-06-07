@@ -7,12 +7,18 @@ from django.db.models import Sum, Q
 from django.db.models.functions import Now, TruncMonth
 
 
-def last_day_of_month(month, year):
-    return datetime(year, month, monthrange(year, month)[1], tzinfo=timezone.utc)
-
-
 def first_day_of_month(month, year):
+    """Returns a datetime object representing the first day of the month/year
+    supplied.
+    """
     return datetime(year, month, monthrange(year, month)[0], tzinfo=timezone.utc)
+
+
+def last_day_of_month(month, year):
+    """Returns a datetime object representing the last day of the month/year
+    supplied.
+    """
+    return datetime(year, month, monthrange(year, month)[1], tzinfo=timezone.utc)
 
 
 class Pal(models.Model):
@@ -36,9 +42,15 @@ class Member(models.Model):
         return f'(member) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
 
     def plan_minutes_remaining(self, month, year):
-        debits = self.account.minuteledger_set \
-            .filter(cancelled=False, amount__lt=0, created__lte=last_day_of_month(month, year)) \
-            .aggregate(Sum("amount"))
+        """Calculates the number of plan minutes remaining for the given month/year
+        based on the number of visits scheduled.
+        """
+        debits = self.account.minuteledger_set.filter(
+            cancelled=False,
+            amount__lt=0,
+            created__gte=first_day_of_month(month, year),
+            created__lte=last_day_of_month(month, year),
+        ).aggregate(Sum("amount"))
 
         total = abs(debits["amount__sum"] or 0)
 
@@ -53,7 +65,10 @@ class Member(models.Model):
         return self.plan_minutes_remaining(now.month, now.year)
 
     def minutes_available(self, month, year):
-        ledger = self.account.minuteledger_set.filter(cancelled=False, created__lte=last_day_of_month(month, year))
+        ledger = self.account.minuteledger_set.filter(
+            cancelled=False,
+            created__lte=last_day_of_month(month, year),
+        )
 
         debits_by_month = ledger \
             .filter(amount__lt=0) \
@@ -63,11 +78,9 @@ class Member(models.Model):
             .values("total") \
             .filter(total__lt=0)
 
-        credits = ledger.filter(amount__gt=0) \
-            .annotate(total=Sum("amount")) \
-            .values("total")
+        credits = ledger.filter(amount__gt=0).aggregate(Sum("amount"))["amount__sum"] or 0
 
-        return sum(row["total"] for row in credits) + sum(row["total"] for row in debits_by_month)
+        return credits + sum(row["total"] for row in debits_by_month)
 
     @property
     def current_minutes_available(self):
@@ -185,4 +198,5 @@ class MinuteLedger(models.Model):
 
     def __str__(self):
         amount = self.amount if self.amount > 0 else f"({abs(self.amount)})"
-        return f"{self.created} | {amount} | {self.account}"
+        cancelled = " (cancelled)" if self.cancelled else ""
+        return f"{self.created} | {amount} | {self.account} {cancelled}"
