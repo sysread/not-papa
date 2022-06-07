@@ -190,11 +190,14 @@ class CompleteFulfillmentForm(PalForm):
             self.cleaned_data["fulfillment"].save()
             self.pal.save()
 
+            # Charge a 15% fee for minutes earned, but take a short-cut by
+            # hard-coding the fee instead of making it config or storing it in
+            # the database or something. :D
             MinuteLedger(
                 account=self.pal.account,
                 visit=self.cleaned_data["fulfillment"].visit,
-                amount=self.cleaned_data["fulfillment"].visit.minutes,
                 reason=MinuteLedger.VISIT_FULFILLED,
+                amount=(0.85 * self.cleaned_data["fulfillment"].visit.minutes),
             ).save()
 
 
