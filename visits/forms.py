@@ -140,8 +140,8 @@ class CancelRequestedVisitForm(MemberForm):
         self.cleaned_data["visit"].cancelled = True
         if commit:
             self.cleaned_data["visit"].save()
-            self.cleaned_data["visit"].fulfillments_set.update(canceled=True)
-            self.cleaned_data["visit"].minutes_set.update(canceled=True)
+            self.cleaned_data["visit"].fulfillment_set.all().update(cancelled=True)
+            self.cleaned_data["visit"].minuteledger_set.all().update(cancelled=True)
 
 
 class AcceptVisitForm(PalForm):
