@@ -1,24 +1,11 @@
-from calendar import monthrange
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum, Q
 from django.db.models.functions import Now, TruncMonth
 
-
-def first_day_of_month(month, year):
-    """Returns a datetime object representing the first day of the month/year
-    supplied.
-    """
-    return datetime(year, month, monthrange(year, month)[0], tzinfo=timezone.utc)
-
-
-def last_day_of_month(month, year):
-    """Returns a datetime object representing the last day of the month/year
-    supplied.
-    """
-    return datetime(year, month, monthrange(year, month)[1], tzinfo=timezone.utc)
+from visits.app.util import utcnow, first_day_of_month, last_day_of_month
 
 
 class Pal(models.Model):
@@ -61,7 +48,7 @@ class Member(models.Model):
 
     @property
     def current_plan_minutes_remaining(self):
-        now = datetime.now(timezone.utc)
+        now = utcnow()
         return self.plan_minutes_remaining(now.month, now.year)
 
     def minutes_available(self, month, year):
@@ -84,7 +71,7 @@ class Member(models.Model):
 
     @property
     def current_minutes_available(self):
-        now = datetime.now(timezone.utc)
+        now = utcnow()
         return self.minutes_available(now.month, now.year)
 
 
@@ -130,6 +117,14 @@ class Visit(models.Model):
         return self.fulfillment is not None and self.fulfillment.completed is True
 
     @property
+    def is_over(self):
+        return utcnow() >= (self.when + timedelta(minutes=self.minutes))
+
+    @property
+    def has_started(self):
+        return utcnow() > self.when
+
+    @property
     def str_state(self):
         if self.cancelled:
             return "cancelled"
@@ -166,7 +161,7 @@ class Fulfillment(models.Model):
         if self.cancelled:
             return False
 
-        return datetime.now(timezone.utc) >= (self.visit.when + timedelta(minutes=self.visit.minutes))
+        return self.visit.is_over
 
     @property
     def is_cancellable(self):
@@ -176,7 +171,7 @@ class Fulfillment(models.Model):
         if self.cancelled:
             return False
 
-        return datetime.now(timezone.utc) < self.visit.when
+        return not self.visit.has_started
 
 
 class MinuteLedger(models.Model):

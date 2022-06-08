@@ -2,6 +2,12 @@
 
 {% block content %}
 
+{% if visits|length == 0 %}
+<p>
+  You do not have any visits scheduled.
+  You can <a href="{% url 'request-visit' %}">request a new visit here</a>.
+</p>
+{% else %}
 <table class="table">
   <thead>
     <th>Visit</th>
@@ -43,5 +49,6 @@
     {% endfor %}
   </tbody>
 </table>
+{% endif %}
 
 {% endblock %}
