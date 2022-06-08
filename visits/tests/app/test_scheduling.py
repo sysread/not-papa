@@ -172,7 +172,7 @@ class CompleteFulfillmentTest(TestCase):
         member = new_user()
         pal = new_user()
 
-        visit = scheduling.create_visit(member.member, utcnow() - timedelta(hours=1), 100, "sorting assorted sorts")
+        visit = scheduling.create_visit(member.member, utcnow() - timedelta(hours=3), 100, "sorting assorted sorts")
         fulfillment = scheduling.create_fulfillment(pal.pal, visit)
         scheduling.complete_fulfillment(fulfillment)
 
@@ -183,3 +183,48 @@ class CompleteFulfillmentTest(TestCase):
         self.assertEqual(tx.reason, MinuteLedger.VISIT_FULFILLED)
         self.assertEqual(tx.amount, 85)  # see visits.app.scheduling.FULFILLMENT_PAL_CUT
         self.assertFalse(tx.cancelled)
+
+
+class CancelFulfillmentTest(TestCase):
+    def test__validate_fulfillment_cancellation(self):
+        member = new_user()
+        pal = new_user()
+
+        visit = scheduling.create_visit(member.member, utcnow() + timedelta(hours=1), 30, "sorting assorted sorts")
+        fulfillment = scheduling.create_fulfillment(pal.pal, visit)
+
+        scheduling.validate_fulfillment_cancellation(fulfillment.pk)  # does not raise ValidationError
+
+        # fulfillment already completed
+        fulfillment.completed = True
+        fulfillment.save()
+        with self.assertRaises(ValidationError):
+            scheduling.validate_fulfillment_cancellation(fulfillment.pk)
+
+        # fulfillment cancelled
+        fulfillment.completed = False
+        fulfillment.cancelled = True
+        fulfillment.save()
+        with self.assertRaises(ValidationError):
+            scheduling.validate_fulfillment_cancellation(fulfillment.pk)
+
+        # visit already started
+        fulfillment.completed = False
+        fulfillment.cancelled = False
+        fulfillment.save()
+        visit.when = utcnow() - timedelta(minutes=10)
+        visit.save()
+        with self.assertRaises(ValidationError):
+            scheduling.validate_fulfillment_cancellation(fulfillment.pk)
+
+    def test__cancel_fulfillment(self):
+        member = new_user()
+        pal = new_user()
+
+        visit = scheduling.create_visit(member.member, utcnow() + timedelta(hours=1), 30, "sorting assorted sorts")
+        fulfillment = scheduling.create_fulfillment(pal.pal, visit)
+
+        scheduling.cancel_fulfillment(fulfillment)
+        fulfillment.refresh_from_db()
+
+        self.assertTrue(fulfillment.cancelled)
