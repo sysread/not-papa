@@ -95,6 +95,7 @@ class MemberVisitRequestForm(MemberForm):
 
         return cleaned_data
 
+    @transaction.atomic
     def save(self, commit=True):
         if self.cleaned_data["when"] < datetime.now(timezone.utc):
             raise ValidationError("Visits must be scheduled in advance.")
@@ -136,6 +137,7 @@ class CancelRequestedVisitForm(MemberForm):
 
         return cleaned_data
 
+    @transaction.atomic
     def save(self, commit=True):
         self.cleaned_data["visit"].cancelled = True
         if commit:
@@ -183,6 +185,7 @@ class CompleteFulfillmentForm(PalForm):
 
         return cleaned_data
 
+    @transaction.atomic
     def save(self, commit=True):
         self.cleaned_data["fulfillment"].completed = True
 
