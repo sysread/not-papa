@@ -27,6 +27,13 @@
 
     $ python manage.py test visits
 
+Verbosely:
+
+    $ python manage.py test -v2
+
+In parallel:
+
+    $ python manage.py test --parallel=4
 
 # TIPS
 
@@ -65,3 +72,4 @@ As well as the execution plan:
 * Cron job to cancel visits which never get accepted by a pal and notify the member
 * Visits should show location on the pal's schedule manager
 * Visits show names when Pal has visited the Member in the past
+* Add validation to ensure the same account does not fulfill its own visits

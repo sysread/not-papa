@@ -92,7 +92,7 @@ class AcceptVisitForm(UserForm):
 
     def clean(self):
         cleaned_data = super().clean()
-        cleaned_data["visit"] = scheduling.validate_pal_fulfillment(self.pal, cleaned_data["visit_id"])
+        cleaned_data["visit"] = scheduling.validate_new_fulfillment(self.pal, cleaned_data["visit_id"])
         return cleaned_data
 
     def save(self, commit=True):

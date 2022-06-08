@@ -18,7 +18,7 @@ def validate_new_visit(member, when, minutes):
     the member does not have the accrued minutes to schedule a new visit during
     the specified time period.
     """
-    if when < utcnow():
+    if when <= utcnow():
         raise ValidationError("Visits must be scheduled in advance.")
 
     plan = member.plan_minutes_remaining(when.month, when.year)
@@ -74,7 +74,7 @@ def cancel_visit(visit, commit=True):
         visit.minuteledger_set.all().update(cancelled=True)
 
 
-def validate_pal_fulfillment(pal, visit_id):
+def validate_new_fulfillment(pal, visit_id):
     """Raises a ValidationError if the Pal cannot fulfill this Visit.
     """
     visit = None
@@ -98,8 +98,11 @@ def create_fulfillment(pal, visit, commit=True):
     considered "scheduled" but not "completed".
     """
     fulfillment = Fulfillment(visit=visit, pal=pal)
+
     if commit:
         fulfillment.save()
+
+    return fulfillment
 
 
 def validate_fulfillment_completion(fulfillment_id):
