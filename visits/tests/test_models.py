@@ -35,3 +35,30 @@ class MemberTest(TestCase):
 
         # Pal has earned 85% of those 100 minutes to add onto their own
         self.assertEqual(pal.member.minutes_available(when.month, when.year), 300 + (100 * scheduling.FULFILLMENT_PAL_CUT))
+
+    def test__plan_minutes_remaining(self):
+        member = new_user(mins=300)
+        pal = new_user(mins=300)
+        when = utcnow() - timedelta(hours=1)
+
+        self.assertEqual(member.member.plan_minutes_remaining(when.month, when.year), 300)
+
+        # Schedule a visit. The minutes are deducted from the member's monthly balance.
+        visit1 = scheduling.create_visit(member.member, when, 100, "do things")
+        self.assertEqual(member.member.plan_minutes_remaining(when.month, when.year), 200)
+
+        # Schedule pal to fulfill the visit. The member's monthly balance is unchanged.
+        fulfillment = scheduling.create_fulfillment(pal.pal, visit1)
+        self.assertEqual(member.member.plan_minutes_remaining(when.month, when.year), 200)
+
+        # Complete the visit. The member's monthly balance is unchanged.
+        scheduling.complete_fulfillment(fulfillment)
+        self.assertEqual(member.member.plan_minutes_remaining(when.month, when.year), 200)
+
+        # Schedule a second visit. The minutes are deducted from the member's balance.
+        visit2 = scheduling.create_visit(member.member, when, 50, "do other things")
+        self.assertEqual(member.member.plan_minutes_remaining(when.month, when.year), 150)
+
+        # Cancel the visit. The minutes are returned to the member's balance.
+        scheduling.cancel_visit(visit2)
+        self.assertEqual(member.member.plan_minutes_remaining(when.month, when.year), 200)

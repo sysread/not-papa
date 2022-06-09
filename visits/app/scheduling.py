@@ -21,9 +21,7 @@ def validate_new_visit(member, when, minutes):
     if when <= utcnow():
         raise ValidationError("Visits must be scheduled in advance.")
 
-    plan = member.plan_minutes_remaining(when.month, when.year)
-    banked = member.minutes_available(when.month, when.year)
-    available = plan + banked
+    available = member.minutes_available(when.month, when.year)
 
     if minutes > available:
         raise ValidationError(f"You have {available} minutes remaining this month. You can earn more minutes by visiting other members, cancelling planned visits, or scheduling farther into the future.")
