@@ -1,23 +1,12 @@
-import random
-import string
 from datetime import timedelta
 
 from django.test import TestCase
 from django.core.exceptions import ValidationError
 
-import visits.app.account as account
 import visits.app.scheduling as scheduling
 from visits.app.util import utcnow
 from visits.models import Fulfillment, MinuteLedger
-
-
-def rstr(size):
-    return ''.join(random.choice(string.ascii_letters) for x in range(size))
-
-
-def new_user(mins=90):
-    email = f"{rstr(5)}@{rstr(10)}.com"
-    return account.add_new_account(rstr(5), rstr(5), email, "swordfish", mins)
+from visits.tests import new_user
 
 
 class NewVisitTest(TestCase):

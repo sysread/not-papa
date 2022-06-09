@@ -29,8 +29,8 @@ class Member(models.Model):
         return f'(member) {self.account.first_name} {self.account.last_name} <{self.account.email}>'
 
     def plan_minutes_remaining(self, month, year):
-        """Calculates the number of plan minutes remaining for the given month/year
-        based on the number of visits scheduled.
+        """Calculates the number of plan minutes remaining for the given
+        month/year based on the number of visits scheduled.
         """
         debits = self.account.minuteledger_set.filter(
             cancelled=False,
@@ -52,22 +52,46 @@ class Member(models.Model):
         return self.plan_minutes_remaining(now.month, now.year)
 
     def minutes_available(self, month, year):
-        ledger = self.account.minuteledger_set.filter(
-            cancelled=False,
-            created__lte=last_day_of_month(month, year),
-        )
+        """Returns the number of minutes available for scheduling new visits
+        for the given month/year. This is kind of complicated to calculate,
+        because monthly plan minutes are ephemeral and minutes used each month
+        only count against banked minutes after first hitting that plan minute
+        total.
 
-        debits_by_month = ledger \
-            .filter(amount__lt=0) \
-            .annotate(month=TruncMonth("created")) \
-            .values("month") \
-            .annotate(total=Sum("amount") + self.plan_minutes) \
-            .values("total") \
-            .filter(total__lt=0)
+        The member earns banked minutes by fulfilling visits as a pal. Those
+        are simple and can be summed by aggregating all positive entries in
+        their ledger.
 
+        To figure out how many minutes a member has used each month, we first
+        have to collect the aggregate sum of minutes used each month. Any
+        minutes used above the number of monthly plan_minutes represents the
+        total debit to count against the member's banked minutes.
+
+        Finally, we add in any remaining minutes from the member's plan for the
+        selected month.
+        """
+        ledger = self.account.minuteledger_set.filter(cancelled=False)
+
+        # Sum up credits
         credits = ledger.filter(amount__gt=0).aggregate(Sum("amount"))["amount__sum"] or 0
 
-        return credits + sum(row["total"] for row in debits_by_month)
+        # Select debits
+        debits_by_month = ledger.filter(amount__lt=0)
+        # Group by YYYY-MM
+        debits_by_month = debits_by_month.annotate(month=TruncMonth("created")).values("month")
+        # Add up amounts and subtract from plan_minutes (total will be
+        # negative, so total + plan_minutes == plan_minutes - -total)
+        debits_by_month = debits_by_month.annotate(total=Sum("amount") + self.plan_minutes).values("month", "total")
+        # Limit results to those where the total of debits is greater than the
+        # monthly plan minutes
+        debits_by_month = debits_by_month.filter(total__lt=0)
+        # Sum all debits
+        debits = sum(row["total"] for row in debits_by_month)
+
+        # Get the number of minutes remaining in the member's plan
+        plan_minutes = self.plan_minutes_remaining(month, year)
+
+        return  plan_minutes + credits + debits
 
     @property
     def current_minutes_available(self):
