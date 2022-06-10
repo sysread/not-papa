@@ -98,3 +98,4 @@ As well as the execution plan:
 * Cron job to cancel `Visit`s which never get accepted by a `Pal` and notify the `Member`
 * `Visit`s show names when `Pal` has `Visit`ed the `Member` in the past
 * Validation to ensure the same account does not fulfill its own `Visit`s
+* Browser tests (e.g., selenium)
