@@ -2,7 +2,7 @@
 
 ## BEHAVIOR
 
-* When a user account is registered, both a `Pal` and `Member` account are created for it, since the requirements suggest that members may double as pals and can earn extra visit time by fulfilling appointments for other members
+* When a user account is registered, both a `Pal` and `Member` account are created for it, since the requirements suggest that `Member`s may double as `Pals` and can earn extra `Visit` time by fulfilling appointments for other `Member`s
 * "Banked" minutes are tracked via `MinuteLedger`
   * Both credits and debits live together in the table as positive and negative amounts, respectively
   * Entries are linked to the underlying `User` account, since each `User` has both a `Member` and `Pal` account
@@ -80,14 +80,14 @@ As well as the execution plan:
 # FUTURE
 
 * `User`s' time zones should be detected and used to control the display of dates and times on relevant pages
-* "Request a visit" form should have a usable date/time picker widget
-* `Member`s' address would be needed to schedule and make an actual visit
+* "Request a `Visit`" form should have a usable date/time picker widget
+* `Member`s' address would be needed to schedule and make an actual `Visit`
 * Insurance `Plan` model that includes the number of plan minutes
 * All the kinds of security required to make account registration safe
-* On the member's visits list, convert individual forms into a FormSet so we don't lose error messages on failed cancelations
-* Paginate the list of completed visits when displaying a member's visits
-* Segregate list of visits by status, with incomplete visits in ascending order, but completed visits in descending order
+* On the `Member`'s `Visits` list, convert individual forms into a `FormSet` so we don't lose error messages on failed cancelations
+* Paginate the list of completed `Visits` when displaying a `Member`'s `Visits`
+* Segregate list of `Visit`s by status, with incomplete `Visit`s in ascending order, but completed `Visit`s in descending order
 * Profile page with transaction history and minutes balances
-* Cron job to cancel visits which never get accepted by a pal and notify the member
-* `Visit`s show names when `Pal` has visited the `Member` in the past
-* Validation to ensure the same account does not fulfill its own visits
+* Cron job to cancel `Visit`s which never get accepted by a `Pal` and notify the `Member`
+* `Visit`s show names when `Pal` has `Visit`ed the `Member` in the past
+* Validation to ensure the same account does not fulfill its own `Visit`s
