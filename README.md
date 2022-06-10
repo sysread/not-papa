@@ -54,7 +54,10 @@
 
 # TIPS
 
-## Create a super-user account to log into `/admin`
+## Log into `/admin` to inspect and manage data
+
+`/admin` provides a fairly full-featured CRUD for a django app's database. In
+order to log into it, you will need a superuser account.
 
     python manage.py createsuperuser --username=someone --email=someone@somewhere.com
 
