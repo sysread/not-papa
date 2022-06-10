@@ -4,7 +4,7 @@
 
 * When a user account is registered, both a `Pal` and `Member` account are created for it, since the requirements suggest that `Member`s may double as `Pals` and can earn extra `Visit` time by fulfilling appointments for other `Member`s
 * `Member`s have an ephemeral monthly allowance of `plan_minutes`, which turn over at the beginning of each month
-    * **NOTE*** this was not one of the requirements in the instructions; it was an unnecessary complication that I was curious about how to implement
+    * **NOTE** this was not one of the requirements in the instructions; it was an unnecessary complication... _but one that I was curious about how to implement_
 * "Banked" minutes are tracked via `MinuteLedger`
     * Both credits and debits live together in the table as positive and negative amounts, respectively
     * Entries are linked to the underlying `User` account, since each `User` has both a `Member` and `Pal` account
