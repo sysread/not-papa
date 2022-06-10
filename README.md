@@ -3,9 +3,12 @@
 ## BEHAVIOR
 
 * When a user account is registered, both a `Pal` and `Member` account are created for it, since the requirements suggest that `Member`s may double as `Pals` and can earn extra `Visit` time by fulfilling appointments for other `Member`s
+* `Member`s have an ephemeral monthly allowance of `plan_minutes`, which turn over at the beginning of each month
+    * **NOTE*** this was not one of the requirements in the instructions; it was an unnecessary complication that I was curious about how to implement
 * "Banked" minutes are tracked via `MinuteLedger`
-  * Both credits and debits live together in the table as positive and negative amounts, respectively
-  * Entries are linked to the underlying `User` account, since each `User` has both a `Member` and `Pal` account
+    * Both credits and debits live together in the table as positive and negative amounts, respectively
+    * Entries are linked to the underlying `User` account, since each `User` has both a `Member` and `Pal` account
+    * A `Member`'s `plan_minutes` are not included in the table as a credit since they do not carry over at the end of the month (see `visits.model.Member.minutes_available()` for the details on how banked minutes are calculated)
 * When a `Member` requests a `Visit`, a debit is added to their `MinuteLedger`
 * When a `Pal` accepts a `Visit`, a `Fulfillment` is created
 * Cancelling a `Visit` will also cancel any associated `Fulfillment`s and `MinuteLedger`s
@@ -82,6 +85,7 @@ As well as the execution plan:
 
 # FUTURE
 
+* Monthly roll-ups of the `MinuteLedger` to make calculation of banked minutes simpler and more efficient
 * `User`s' time zones should be detected and used to control the display of dates and times on relevant pages
 * "Request a `Visit`" form should have a usable date/time picker widget
 * `Member`s' address would be needed to schedule and make an actual `Visit`
